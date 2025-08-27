@@ -55,11 +55,13 @@
   }
   .card .bd{ padding:16px}
   label{ display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
-  input[type=text], input[type=number], textarea, select{
+  input[type=text], input[type=number], input[type=date], textarea, select{
     width:100%;
     padding:10px 12px; border-radius:10px; border:1px solid var(--border);
     background:var(--panel-2); color:var(--text); outline:none;
   }
+  /* Fix for date picker icon color in dark mode */
+  input[type="date"] { color-scheme: dark; }
   textarea{ min-height:80px; resize:vertical}
   .row{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap}
   .row > div{ flex:1 1 160px}
@@ -283,7 +285,7 @@
         <label>Describe your request, fields, and approvals</label>
         <textarea id="geminiPrompt" placeholder="Example:
 Request: Vendor Onboarding
-Fields: Requestor (People-Picker, All steps); Vendor Name (Textfield, Step 1); Category (Dropdown: Software, Hardware, Services, Step 1); Notes (Comment Box, All steps, desc: Internal notes for approvers); Amount (Textfield, Step 2)
+Fields: Requestor (People-Picker, All steps); Vendor Name (Textfield, Step 1); Category (Dropdown: Software, Hardware, Services, Step 1); Start Date (Date, Step 1); Notes (Comment Box, All steps, desc: Internal notes for approvers); Amount (Textfield, Step 2)
 Approvals: Manager > Procurement + Legal > CFO or CEO (Amount > 50000)
 "></textarea>
         <div class="small muted">Gemini will return a JSON config for this builder.</div>
@@ -445,6 +447,7 @@ const FIELD_TYPES = [
   {value:'label', text:'Label'},
   {value:'text', text:'Textfield'},
   {value:'people', text:'People-Picker'},
+  {value:'date', text: 'Date Picker'},
   {value:'textarea', text:'Comment Box'},
   {value:'dropdown', text:'Dropdown List'},
   {value:'db', text:'DB Connection'},
@@ -650,6 +653,9 @@ function renderForm(containerId = 'previewForm'){
     } else if(f.type==='text'){
       fieldElement = document.createElement('input');
       fieldElement.type='text';
+    } else if(f.type === 'date') {
+      fieldElement = document.createElement('input');
+      fieldElement.type = 'date';
     } else if(f.type==='people'){
       const div = document.createElement('div');
       div.className='pp-wrap';
@@ -750,7 +756,7 @@ function evaluateCondition(cond){
   if(!field) return null;
   
   const formVal = run.formState[field.id];
-  if(formVal === undefined || formVal === null) return null;
+  if(formVal === undefined || formVal === null || formVal === '') return null;
   
   const rightNum = Number(rightRaw);
   const leftNum = Number(formVal);
@@ -937,7 +943,7 @@ function generateMock(){
 =============================== */
 function geminiPromptTemplate(userText){
   return `You are helping build a Form + Workflow mock-up. Return ONLY minified JSON (no backticks, no prose) matching this schema:
-{"requestName":"string","approvalDsl":"string","fields":[{"label":"string","type":"label|text|...","options":["string", "..."],"visibility":"all"|"step:N", "description":"optional string"}]}`;
+{"requestName":"string","approvalDsl":"string","fields":[{"label":"string","type":"label|text|people|date|...","options":["string", "..."],"visibility":"all"|"step:N", "description":"optional string"}]}`;
 }
 async function callGemini(apiKey, text){
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -1007,7 +1013,7 @@ $('#import-from-file-btn').addEventListener('click', () => {
 });
 $('#btn-load-sample').addEventListener('click', ()=>{
   loadConfig({ requestName: 'Hardware Request', approvalDsl: 'Employee > Manager > Procurement (Category == "Standard") or IT Security (Category == "Specialized") > CIO (Amount > 5000)',
-    fields: [ {id:uid(), label:'Employee Name', type:'people', visibility:'all', description: 'The employee requesting the hardware.'}, {id:uid(), label:'Category', type:'dropdown', options:['Standard','Specialized'], visibility:'step:1', description: 'Select the category of hardware.'}, {id:uid(), label:'Item', type:'text', visibility:'step:1', description: 'e.g., Laptop, Monitor, Keyboard'}, {id:uid(), label:'Amount', type:'text', visibility:'step:1'}, {id:uid(), label:'Business Justification', type:'textarea', visibility:'all'}, ] });
+    fields: [ {id:uid(), label:'Employee Name', type:'people', visibility:'all', description: 'The employee requesting the hardware.'}, {id:uid(), label:'Category', type:'dropdown', options:['Standard','Specialized'], visibility:'step:1', description: 'Select the category of hardware.'}, {id:uid(), label:'Item', type:'text', visibility:'step:1', description: 'e.g., Laptop, Monitor, Keyboard'}, {id:uid(), label:'Amount', type:'text', visibility:'step:1'}, {id:uid(), label:'Due Date', type:'date', visibility:'step:1', description: 'When is this hardware needed by?'}, {id:uid(), label:'Business Justification', type:'textarea', visibility:'all'}, ] });
 });
 $('#geminiKey').value = localStorage.getItem('GEMINI_API_KEY') || '';
 $('#geminiKey').addEventListener('change', ()=> localStorage.setItem('GEMINI_API_KEY', $('#geminiKey').value));

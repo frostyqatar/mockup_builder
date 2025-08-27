@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Form + Workflow Mock-up Builder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0d12;
+    --panel:#121521;
+    --panel-2:#171a28;
+    --muted:#9aa3b2;
+    --text:#e8edf4;
+    --accent:#5c86ff;
+    --accent-2:#00c2a8;
+    --warn:#ffb54a;
+    --danger:#ff6b6b;
+    --ok:#28c495;
+    --border:#24283a;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans";
+    color:var(--text);
+    background:linear-gradient(180deg, #0b0d12 0%, #0b0d12 30%, #0e111a 100%);
+  }
+  header{
+    padding:18px 20px;
+    border-bottom:1px solid var(--border);
+    background:rgba(18,21,33,0.8);
+    backdrop-filter: blur(6px);
+    position:sticky; top:0; z-index:1000;
+    display:flex; align-items:center; gap:14px;
+  }
+  header h1{ margin:0; font-size:18px; font-weight:700; letter-spacing:.2px;}
+  header .tag{ font-size:12px; padding:2px 8px; border-radius:999px; background:var(--panel-2); color:var(--muted); border:1px solid var(--border)}
+  .wrap{ max-width:1200px; margin:0 auto; padding:20px}
+  .grid{ display:grid; gap:16px}
+  @media(min-width:1000px){
+    .grid{ grid-template-columns: 1fr 1fr}
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    overflow:hidden;
+  }
+  .card .hd{
+    padding:12px 16px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  }
+  .card .bd{ padding:16px}
+  label{ display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+  input[type=text], input[type=number], textarea, select{
+    width:100%;
+    padding:10px 12px; border-radius:10px; border:1px solid var(--border);
+    background:var(--panel-2); color:var(--text); outline:none;
+  }
+  textarea{ min-height:80px; resize:vertical}
+  .row{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap}
+  .row > div{ flex:1 1 160px}
+  .btn{
+    appearance:none; border:1px solid var(--border); background:var(--panel-2);
+    color:var(--text); padding:9px 12px; border-radius:10px; cursor:pointer;
+  }
+  .btn:hover{ border-color:#334; background:#131625}
+  .btn.primary{ background:linear-gradient(180deg, #5c86ff, #4769d8); border:none}
+  .btn.good{ background:linear-gradient(180deg, #28c495, #1fa27c); border:none}
+  .btn.warn{ background:linear-gradient(180deg, #ffb54a, #e3922b); border:none}
+  .btn.danger{ background:linear-gradient(180deg, #ff6b6b, #e24e4e); border:none}
+  .btn.ghost{ background:transparent; border:1px dashed var(--border)}
+  .tabs{ display:flex; gap:8px}
+  .tab{ padding:8px 12px; border-radius:999px; border:1px solid var(--border); cursor:pointer; color:var(--muted)}
+  .tab.active{ background:var(--panel-2); color:var(--text)}
+  .fields-list{ display:flex; flex-direction:column; gap:10px}
+  .field-item{ border:1px solid var(--border); background:var(--panel-2); border-radius:12px; padding:10px}
+  .field-item .row{ align-items:center}
+  .small{ font-size:12px; color:var(--muted)}
+  .code{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; padding:8px 10px; background:#0f1320; border:1px solid var(--border); border-radius:8px; overflow:auto}
+  .timeline{ display:flex; gap:12px; align-items:flex-start; overflow:auto; padding-bottom:4px}
+  .stage{
+    min-width:120px; background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:10px;
+    position:relative;
+  }
+  .stage.current{ outline:2px solid var(--accent)}
+  .stage.done{ opacity:.7; border-color:#2b6}
+  .stage .title{ font-weight:700; font-size:12px; margin-bottom:6px}
+  .chips{ display:flex; flex-wrap:wrap; gap:6px}
+  .chip{
+    font-size:11px; padding:4px 8px; border-radius:999px; background:#0f1526; border:1px solid #223; color:#b9c3d6
+  }
+  .chip.alt{ background:#0f1a16; border-color:#204; color:#b9e6dc}
+  .chip.warn{ background:#191307; border-color:#43320f; color:#ffd48e}
+  .split{ display:grid; gap:16px}
+  @media(min-width:900px){ .split{ grid-template-columns: 1.2fr .8fr} }
+  .preview-form{ display:flex; flex-direction:column; gap:12px}
+  
+  .preview-form .field-description { 
+    font-size: 11px; 
+    color: var(--muted); 
+    margin-top: 4px; 
+    margin-bottom: 4px; 
+    padding-left: 2px;
+  }
+
+  .pp-wrap{ position:relative}
+  .pp-suggest{
+    position:absolute; top:100%; left:0; right:0; z-index:20; background:var(--panel); border:1px solid var(--border);
+    border-radius:10px; padding:6px; display:none; max-height:140px; overflow:auto
+  }
+  .pp-suggest div{ padding:6px 8px; border-radius:6px; cursor:pointer}
+  .pp-suggest div:hover{ background:#151a2a}
+  .pill{ display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:999px; background:#0e1527; border:1px solid #223; font-size:12px; color:#b2bcd0}
+  .kbr{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#0c1020; border:1px solid #1a1f33; padding:1px 6px; border-radius:6px}
+  .help li{ margin:6px 0}
+  .divider{ height:1px; background:var(--border); margin:10px 0}
+  .right{ text-align:right}
+  .spacer{ flex:1 }
+  .muted{ color:var(--muted) }
+  .center{ text-align:center }
+
+  /* --- MODAL STYLES --- */
+  .modal-overlay {
+    position: fixed; z-index: 2000; left: 0; top: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(8px);
+    display: none; /* Toggled by JS */
+    align-items: center; justify-content: center;
+  }
+  .modal-content {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 14px;
+    width: 90%;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #fullscreen-modal .modal-content { max-width: 1400px; height: 90%; }
+  #import-modal .modal-content { max-width: 600px; }
+  .modal-header {
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .modal-header strong { font-size: 18px; }
+  .modal-close-btn {
+    background: none; border: none; color: var(--muted);
+    font-size: 28px; font-weight: bold; cursor: pointer; padding: 0 8px;
+  }
+  .modal-body { padding: 20px; flex: 1; overflow-y: auto; }
+  .modal-footer {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    display: flex; gap: 10px; justify-content: flex-end;
+    background: var(--panel);
+  }
+  #import-json-textarea {
+      min-height: 250px;
+      resize: vertical;
+  }
+  .pdf-export-note {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--warn); color: #000; padding: 10px 20px; border-radius: 8px;
+    z-index: 9999; display: none;
+  }
+
+  /* NEW: Print-friendly styles for PDF capture */
+  .pdf-capture-mode {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 16px; /* Re-add padding that might be lost */
+  }
+  .pdf-capture-mode .card,
+  .pdf-capture-mode .stage,
+  .pdf-capture-mode input,
+  .pdf-capture-mode select,
+  .pdf-capture-mode textarea,
+  .pdf-capture-mode .pill,
+  .pdf-capture-mode .chip {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #cccccc !important;
+  }
+  .pdf-capture-mode label,
+  .pdf-capture-mode .muted,
+  .pdf-capture-mode .chip,
+  .pdf-capture-mode .field-description {
+    color: #555555 !important;
+  }
+  .pdf-capture-mode .stage.current {
+    outline: 2px solid #0056b3 !important;
+  }
+  /* NEW: Highlight selected branch in PDF export */
+  .pdf-capture-mode .chip.alt {
+    background: #d4edda !important;
+    color: #155724 !important;
+    border: 1px solid #b7e0c1 !important;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Form + Workflow Mock‑up Builder</h1>
+  
+  <span class="spacer"></span>
+  <nav class="tabs" id="tabs">
+    <div class="tab active" data-tab="builder">Builder</div>
+    <div class="tab" data-tab="preview">Preview</div>
+    <div class="tab" data-tab="gemini">🤖</div>
+    <div class="tab" data-tab="help">Help</div>
+  </nav>
+</header>
+
+<div class="wrap">
+  <!-- BUILDER -->
+  <section class="grid tabpanel" id="tab-builder">
+    <div class="card">
+      <div class="hd">
+        <strong>Setup</strong>
+        <div class="right">
+          <button class="btn ghost" id="btn-load">Import JSON</button>
+          <button class="btn ghost" id="btn-save">Export JSON</button>
+          <button class="btn primary" id="btn-generate">Generate Mock‑up</button>
+        </div>
+      </div>
+      <div class="bd grid">
+        <div>
+          <label>Request Name</label>
+          <input id="requestName" type="text" placeholder="e.g., Access Request, Travel Request" />
+        </div>
+        <div>
+          <label>Approval DSL</label>
+          <textarea id="approvalDsl" placeholder="e.g., Requester > Manager > Finance + HR > CFO or CEO (Amount > 10000)"></textarea>
+          <div class="small muted">Use <span class="kbr">&gt;</span> for sequence, <span class="kbr">+</span> for consensus (parallel), and <span class="kbr">or</span> for branching. Optional conditions in <span class="kbr">( )</span>.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <strong>UI Fields</strong>
+        <div><button class="btn" id="btn-add-field">Add Field</button></div>
+      </div>
+      <div class="bd">
+        <div class="fields-list" id="fieldsList"></div>
+      </div>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <div class="hd">
+        <strong>Quick Start</strong>
+        <div><button class="btn warn" id="btn-load-sample">Load Sample</button></div>
+      </div>
+      <div class="bd">
+        <p class="small muted">
+          1) Add fields → 2) Write approvals → 3) Generate → 4) Simulate Approve flow in Preview.  
+          You can export/import JSON to collaborate, and optionally use Gemini Assist to auto‑create from a description.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- GEMINI -->
+  <section class="grid tabpanel" id="tab-gemini" style="display:none">
+    <div class="card">
+      <div class="hd">
+        <strong>Gemini Flash Assist</strong>
+        <div class="right">
+          <button class="btn" id="btn-gemini-build">Build from Prompt</button>
+        </div>
+      </div>
+      <div class="bd">
+        <div class="row">
+          <div>
+            <label>GEMINI_API_KEY</label>
+            <input type="text" id="geminiKey" placeholder="Your API key (stored locally)" />
+            <div class="small muted">Key is kept in <code>localStorage</code> and used client‑side to call Google’s API.</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <label>Describe your request, fields, and approvals</label>
+        <textarea id="geminiPrompt" placeholder="Example:
+Request: Vendor Onboarding
+Fields: Requestor (People-Picker, All steps); Vendor Name (Textfield, Step 1); Category (Dropdown: Software, Hardware, Services, Step 1); Notes (Comment Box, All steps, desc: Internal notes for approvers); Amount (Textfield, Step 2)
+Approvals: Manager > Procurement + Legal > CFO or CEO (Amount > 50000)
+"></textarea>
+        <div class="small muted">Gemini will return a JSON config for this builder.</div>
+        <div class="divider"></div>
+        <label>Last Gemini Response (raw)</label>
+        <pre class="code" id="geminiRaw" style="min-height:100px"></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><strong>Notes</strong></div>
+      <div class="bd small muted">
+        <ul>
+          <li>This is an optional accelerator; you can always build manually in the Builder tab.</li>
+          <li>If CORS blocks in your environment, call the API from a small backend or a secure proxy.</li>
+          <li>We instruct Gemini to output a specific JSON schema; you can tweak the prompt if needed.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- PREVIEW -->
+  <section class="tabpanel" id="tab-preview" style="display:none">
+    <div class="split">
+      <div class="card">
+        <div class="hd"><strong id="mockTitle">Mock‑up</strong>
+          <div class="right" style="display:flex; gap:8px; align-items:center;">
+            <button class="btn ghost" id="btn-fullscreen">Full Screen</button>
+            <button class="btn ghost" id="btn-export-pdf">Export PDF</button>
+            <span class="pill">Acting as: <select id="actingAs"></select></span>
+            <button class="btn good" id="btn-approve">Approve</button>
+            <button class="btn danger" id="btn-reject">Reject</button>
+            <button class="btn ghost" id="btn-reset-flow">Reset Flow</button>
+          </div>
+        </div>
+        <div class="bd" id="main-preview-content">
+          <div id="timeline" class="timeline" style="margin-bottom:10px"></div>
+          <div id="explain" class="small muted" style="margin-bottom:12px"></div>
+          <div class="preview-form" id="previewForm"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="hd"><strong>State & Config</strong></div>
+        <div class="bd">
+          <label>Current State</label>
+          <pre class="code" id="stateOut" style="min-height:120px"></pre>
+          <label>Config (parsed)</label>
+          <pre class="code" id="configOut" style="min-height:180px"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HELP -->
+  <section class="tabpanel" id="tab-help" style="display:none">
+    <div class="card">
+      <div class="hd"><strong>How the Approval DSL Works</strong></div>
+      <div class="bd help">
+        <ul>
+          <li>Sequence with <span class="kbr">&gt;</span>: <code>Requester &gt; Manager &gt; Finance</code></li>
+          <li>Consensus (parallel) with <span class="kbr">+</span>: <code>Finance + HR</code> (both must approve)</li>
+          <li>Branch with <span class="kbr">or</span>: <code>CFO or CEO (Amount &gt; 10000)</code>  
+              Conditions in parentheses are evaluated against field values when possible.</li>
+          <li>Example (all together):  
+            <div class="code">Requester &gt; Manager &gt; Finance + HR &gt; CFO or CEO (Amount > 10000)</div>
+          </li>
+          <li>Fields can be shown on <strong>All steps</strong> or a specific <strong>Step N</strong>.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- MODALS -->
+<div id="fullscreen-modal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <strong id="modalTitle">Mock-up Preview</strong>
+      <button class="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <!-- Content is dynamically generated -->
+    </div>
+    <div class="modal-footer" id="modal-footer">
+      <!-- Buttons are dynamically generated -->
+    </div>
+  </div>
+</div>
+
+<div id="import-modal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <strong>Import Configuration</strong>
+      <button class="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label>Paste JSON configuration below</label>
+      <textarea id="import-json-textarea" placeholder='{ "requestName": "My Request", ... }'></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn ghost" id="import-from-file-btn">Load from File...</button>
+      <span class="spacer"></span>
+      <button class="btn" id="import-cancel-btn">Cancel</button>
+      <button class="btn primary" id="import-apply-btn">Apply</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* ===============================
+   UTILITIES
+=============================== */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+function uid(prefix='id'){
+  return prefix + Math.random().toString(36).slice(2,9);
+}
+function saveFile(filename, text){
+  const blob = new Blob([text], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+function readFileAsText(file){
+  return new Promise((res, rej)=>{
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = rej;
+    fr.readAsText(file);
+  });
+}
+function normalizeSpaces(s){ return s.replace(/\s+/g, ' ').trim(); }
+
+/* ===============================
+   GLOBAL STATE
+=============================== */
+let builder = {
+  requestName: '',
+  approvalDsl: '',
+  fields: [] // {id,label,type,options,visibility,description}
+};
+let workflow = { stages: [] }; // parsed from DSL
+let run = {
+  currentStage: 0,
+  parallelApprovals: {}, // stageIndex -> array of actors who approved
+  chosenBranches: {},    // stageIndex -> branchIndex
+  history: [],           // {stage, actor, action}
+  formState: {}          // {fieldId: value} to preserve form data
+};
+
+/* ===============================
+   FIELD BUILDER
+=============================== */
+const FIELD_TYPES = [
+  {value:'label', text:'Label'},
+  {value:'text', text:'Textfield'},
+  {value:'people', text:'People-Picker'},
+  {value:'textarea', text:'Comment Box'},
+  {value:'dropdown', text:'Dropdown List'},
+  {value:'db', text:'DB Connection'},
+  {value:'table', text:'Table'}
+];
+
+function addFieldRow(field){
+  const id = field?.id || uid('f_');
+  const item = document.createElement('div');
+  item.className = 'field-item';
+  item.dataset.id = id;
+  item.innerHTML = `
+    <div class="row">
+      <div>
+        <label>Label</label>
+        <input type="text" class="fi-label" placeholder="e.g., Requestor Name" value="${field?.label||''}">
+      </div>
+      <div>
+        <label>Type</label>
+        <select class="fi-type">
+          ${FIELD_TYPES.map(ft=>`<option value="${ft.value}" ${field?.type===ft.value?'selected':''}>${ft.text}</option>`).join('')}
+        </select>
+      </div>
+      <div style="flex: 2 1 240px;">
+        <label>Visibility</label>
+        <select class="fi-vis">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+      <div>
+        <button class="btn danger fi-del">Remove</button>
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div style="flex-basis: 100%;">
+        <label>Description / Help Text (Optional)</label>
+        <input type="text" class="fi-desc" placeholder="e.g., Please enter your full legal name." value="${field?.description||''}">
+      </div>
+      <div class="fi-opts-wrap" style="flex-basis: 100%;">
+        <label>Options (for Dropdown / Table columns, comma-separated)</label>
+        <input type="text" class="fi-opts" placeholder="e.g., Low, Medium, High" value="${(field?.options||[]).join(', ')}">
+      </div>
+    </div>
+  `;
+  item.querySelector('.fi-del').addEventListener('click', ()=>{
+    item.remove();
+  });
+  
+  // Conditional Options field logic
+  const typeSelect = item.querySelector('.fi-type');
+  const optsWrap = item.querySelector('.fi-opts-wrap');
+  const toggleOptionsVisibility = () => {
+    const show = ['dropdown', 'table'].includes(typeSelect.value);
+    optsWrap.style.display = show ? 'block' : 'none';
+  };
+  typeSelect.addEventListener('change', toggleOptionsVisibility);
+
+  $('#fieldsList').appendChild(item);
+  toggleOptionsVisibility(); // Set initial state
+}
+
+function collectFields(){
+  const items = $$('#fieldsList .field-item');
+  builder.fields = items.map(el=>{
+    const id = el.dataset.id || uid('f_');
+    const label = el.querySelector('.fi-label').value.trim();
+    const type = el.querySelector('.fi-type').value;
+    const desc = el.querySelector('.fi-desc').value.trim();
+    const visibility = el.querySelector('.fi-vis').value;
+    const opts = el.querySelector('.fi-opts').value.split(',').map(s=>s.trim()).filter(Boolean);
+    return { id, label, type, options: opts, visibility, description: desc };
+  });
+}
+
+function getStepsFromDsl(dslRaw) {
+  const parsed = parseApprovalDSL(dslRaw);
+  if (!parsed.stages || parsed.stages.length === 0) return [];
+  return parsed.stages.map((stage, i) => {
+    let description;
+    if (stage.type === 'single') {
+      description = stage.actors[0];
+    } else if (stage.type === 'parallel') {
+      description = stage.actors.join(' + ');
+    } else if (stage.type === 'choice') {
+      description = stage.branches.map(b => b.actor).join(' or ');
+    }
+    return {
+      value: `step:${i + 1}`,
+      text: `Step ${i + 1}: ${description}`
+    };
+  });
+}
+
+function updateAllVisibilityDropdowns() {
+  const dsl = $('#approvalDsl').value;
+  const steps = getStepsFromDsl(dsl);
+  const optionsHtml = `<option value="all">All steps</option>` + steps.map(s => `<option value="${s.value}">${s.text}</option>`).join('');
+
+  $$('#fieldsList .field-item').forEach(item => {
+    const visSelect = item.querySelector('.fi-vis');
+    const currentVal = visSelect.value;
+    visSelect.innerHTML = optionsHtml;
+    // Try to restore the selected value if it still exists in the new list
+    if (visSelect.querySelector(`option[value="${currentVal}"]`)) {
+      visSelect.value = currentVal;
+    } else {
+      visSelect.value = 'all'; // Default to 'all' if old step is gone
+    }
+  });
+}
+
+/* ===============================
+   APPROVAL DSL PARSER
+=============================== */
+function splitOutsideParens(s, sepRegex){
+  const parts = [];
+  let depth = 0, last = 0;
+  for(let i=0;i<s.length;i++){
+    const ch = s[i];
+    if(ch === '(') depth++;
+    else if(ch === ')') depth = Math.max(0, depth-1);
+    else {
+      const slice = s.slice(i);
+      const m = slice.match(sepRegex);
+      if(m && m.index===0 && depth===0){
+        parts.push(s.slice(last, i));
+        i += m[0].length-1;
+        last = i+1;
+      }
+    }
+  }
+  parts.push(s.slice(last));
+  return parts.map(p=>p.trim()).filter(Boolean);
+}
+function parseActorWithCondition(s){
+  const m = s.match(/^(.*?)(\((.*)\))?$/);
+  const actor = m ? m[1].trim() : s.trim();
+  const condition = (m && m[3]) ? m[3].trim() : '';
+  return { actor, condition };
+}
+function parseApprovalDSL(dslRaw){
+  const dsl = dslRaw.replace(/\u003e/g,'>').trim();
+  if(!dsl) return { stages: [] };
+  const stageTokens = splitOutsideParens(dsl, /\s*>\s*/);
+  const stages = stageTokens.map(tok=>{
+    const hasOr = /\s+or\s+/i.test(tok);
+    if(hasOr){
+      const branches = splitOutsideParens(tok, /\s+or\s+/i).map(b=>{
+        const {actor, condition} = parseActorWithCondition(b);
+        return { actor, condition: condition || '' };
+      });
+      return { type:'choice', branches };
+    }
+    const hasPlus = tok.includes('+');
+    if(hasPlus){
+      const actors = splitOutsideParens(tok, /\s*\+\s*/).map(s=>parseActorWithCondition(s).actor);
+      return { type:'parallel', actors };
+    }
+    const {actor} = parseActorWithCondition(tok);
+    return { type:'single', actors:[actor] };
+  });
+  return { stages };
+}
+
+/* ===============================
+   FORM RENDERING (Mock-up)
+=============================== */
+const PEOPLE = ['Alex Johnson','Fatima Noor','John Smith','Maryam Abbas','Omar Al-Sayed','Priya Patel','Sara Lin','Zhang Wei'];
+
+function renderForm(containerId = 'previewForm'){
+  const wrap = $(`#${containerId}`);
+  wrap.innerHTML = '';
+  const stepIndex = run.currentStage+1;
+
+  const visible = builder.fields.filter(f=>{
+    if(f.visibility==='all') return true;
+    if(f.visibility?.startsWith('step:')){
+      const n = Number(f.visibility.split(':')[1]||1);
+      return n === stepIndex;
+    }
+    return true;
+  });
+
+  if(visible.length===0){
+    const em = document.createElement('div');
+    em.className='small muted';
+    em.textContent = 'No fields visible on this step.';
+    wrap.appendChild(em);
+    return;
+  }
+
+  for(const f of visible){
+    const block = document.createElement('div');
+    const fieldId = `field_${f.id}`;
+    block.innerHTML = `<label for="${fieldId}">${f.label}</label>`;
+    let fieldElement;
+
+    if(f.type==='label'){
+      const span = document.createElement('div');
+      span.className='pill';
+      span.textContent = f.label;
+      fieldElement = span;
+    } else if(f.type==='text'){
+      fieldElement = document.createElement('input');
+      fieldElement.type='text';
+    } else if(f.type==='people'){
+      const div = document.createElement('div');
+      div.className='pp-wrap';
+      const inp = document.createElement('input'); inp.type='text'; inp.placeholder='Type a name'; inp.dataset.fid = f.id;
+      const sug = document.createElement('div'); sug.className='pp-suggest';
+      PEOPLE.forEach(p=>{
+        const o = document.createElement('div'); o.textContent = p;
+        o.addEventListener('click',()=>{ inp.value = p; run.formState[f.id] = p; sug.style.display='none'; updateWorkflowState(); });
+        sug.appendChild(o);
+      });
+      inp.addEventListener('input', ()=>{
+        run.formState[f.id] = inp.value;
+        if(!inp.value.trim()) {sug.style.display='none'; return;}
+        const q = inp.value.toLowerCase();
+        Array.from(sug.children).forEach(d=>{
+          d.style.display = d.textContent.toLowerCase().includes(q) ? 'block':'none';
+        });
+        sug.style.display = 'block';
+      });
+      div.appendChild(inp); div.appendChild(sug);
+      fieldElement = div;
+    } else if(f.type==='textarea'){
+      fieldElement = document.createElement('textarea');
+    } else if(f.type==='dropdown'){
+      const sel = document.createElement('select');
+      (f.options?.length? f.options : ['(No options)']).forEach(o=>{
+        const op = document.createElement('option'); op.value=o; op.textContent=o; sel.appendChild(op);
+      });
+      fieldElement = sel;
+    } else if(f.type==='db'){
+      const frag = document.createDocumentFragment();
+      const cn = document.createElement('input'); cn.type='text'; cn.placeholder='Connection (mock)';
+      const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Test';
+      const out = document.createElement('div'); out.className='small muted'; out.style.marginTop='6px';
+      btn.addEventListener('click',()=>{ out.textContent = 'Connected (simulated).'; tableBuild(['ID','Name'],[['1','Data'],['2','Source']], block); });
+      frag.appendChild(cn); frag.appendChild(btn); frag.appendChild(out);
+      fieldElement = frag;
+    } else if(f.type==='table'){
+      const cols = (f.options?.length ? f.options : ['Col A','Col B']);
+      fieldElement = document.createDocumentFragment();
+      tableBuild(cols, [], fieldElement, true);
+    }
+    
+    if (fieldElement) {
+        if(fieldElement.nodeName !== 'DOCUMENT_FRAGMENT' && !fieldElement.classList.contains('pp-wrap')) {
+            fieldElement.id = fieldId;
+            fieldElement.dataset.fid = f.id;
+            if(run.formState[f.id]) fieldElement.value = run.formState[f.id];
+        }
+        block.appendChild(fieldElement);
+    }
+
+    if (f.description) {
+        const desc = document.createElement('div');
+        desc.className = 'field-description';
+        desc.textContent = f.description;
+        block.appendChild(desc);
+    }
+
+    wrap.appendChild(block);
+  }
+}
+function tableBuild(cols, rows, container, editable=false){
+  const tbl = document.createElement('table');
+  tbl.style.width='100%'; tbl.style.borderCollapse='collapse'; tbl.style.marginTop='6px';
+  tbl.innerHTML = `<thead><tr>${cols.map(c=>`<th style="text-align:left;border-bottom:1px solid var(--border);padding:6px">${c}</th>`).join('')}</tr></thead><tbody></tbody>`;
+  const tb = tbl.querySelector('tbody');
+  rows.forEach(r=>{
+    const tr = document.createElement('tr');
+    r.forEach(v=>{ const td = document.createElement('td'); td.style.padding='6px'; td.textContent = v; tr.appendChild(td); });
+    tb.appendChild(tr);
+  });
+  container.appendChild(tbl);
+  if(editable){
+    const add = document.createElement('button'); add.className='btn'; add.textContent='Add row';
+    add.addEventListener('click',()=>{
+      const tr = document.createElement('tr');
+      cols.forEach(()=> {
+        const td = document.createElement('td'); td.style.padding='6px';
+        const inp = document.createElement('input'); inp.type='text'; inp.style.width='100%';
+        td.appendChild(inp); tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    container.appendChild(add);
+  }
+}
+
+/* ===============================
+   TIMELINE + FLOW ENGINE
+=============================== */
+function evaluateCondition(cond){
+  if(!cond) return null;
+  const m = cond.match(/^(.+?)\s*(>=|<=|==|!=|>|<)\s*(.+)$/);
+  if(!m) return null;
+  const [_, label, op, rightRaw] = m;
+  const field = builder.fields.find(f => f.label.toLowerCase() === label.trim().toLowerCase());
+  if(!field) return null;
+  
+  const formVal = run.formState[field.id];
+  if(formVal === undefined || formVal === null) return null;
+  
+  const rightNum = Number(rightRaw);
+  const leftNum = Number(formVal);
+  const isNumeric = !Number.isNaN(rightNum) && !Number.isNaN(leftNum);
+  const L = isNumeric ? leftNum : String(formVal).trim().toLowerCase();
+  const R = isNumeric ? rightNum : String(rightRaw).trim().toLowerCase();
+
+  switch(op){
+    case '>': return L > R; case '<': return L < R;
+    case '>=': return L >= R; case '<=': return L <= R;
+    case '==': return L == R; case '!=': return L != R;
+  }
+  return null;
+}
+
+function currentActors(){
+  const st = workflow.stages[run.currentStage];
+  if(!st) return [];
+  if(st.type==='single') return st.actors;
+  if(st.type==='parallel'){
+    const approved = run.parallelApprovals[run.currentStage] || [];
+    return st.actors.filter(a=>!approved.includes(a));
+  }
+  if(st.type==='choice'){
+    const idx = run.chosenBranches[run.currentStage];
+    if(typeof idx === 'number') return [st.branches[idx].actor];
+    let auto = -1;
+    for(let i=0;i<st.branches.length;i++){
+      if(evaluateCondition(st.branches[i].condition) === true){ auto = i; break; }
+    }
+    if(auto>=0){
+      run.chosenBranches[run.currentStage] = auto;
+    } else {
+        delete run.chosenBranches[run.currentStage];
+    }
+    return st.branches.map(b=>b.actor);
+  }
+  return [];
+}
+
+function renderTimeline(containerId = 'timeline'){
+  const area = $(`#${containerId}`); area.innerHTML='';
+  if (!workflow.stages) return;
+  workflow.stages.forEach((st, i)=>{
+    const div = document.createElement('div');
+    div.className = 'stage' + (i<run.currentStage?' done':'') + (i===run.currentStage?' current':'');
+    const title = document.createElement('div'); title.className='title'; title.textContent = `Step ${i+1}`;
+    const chips = document.createElement('div'); chips.className='chips';
+    if(st.type==='single'){
+      st.actors.forEach(a=>{ const c = document.createElement('div'); c.className='chip'; c.textContent=a; chips.appendChild(c); });
+    } else if(st.type==='parallel'){
+      st.actors.forEach(a=>{
+        const done = (run.parallelApprovals[i]||[]).includes(a);
+        const c = document.createElement('div'); c.className='chip ' + (done?'alt':''); c.textContent=a + (done?' ✓':''); chips.appendChild(c);
+      });
+      chips.insertAdjacentHTML('beforeend', `<div class="chip warn">Consensus</div>`);
+    } else if(st.type==='choice'){
+      const chosen = run.chosenBranches[i];
+      st.branches.forEach((b, idx)=>{
+        const c = document.createElement('div'); c.className='chip ' + (idx===chosen?'alt':''); c.textContent = b.actor + (b.condition?` (${b.condition})`:''); chips.appendChild(c);
+      });
+    }
+    div.appendChild(title); div.appendChild(chips);
+
+    if(i===run.currentStage && st.type==='choice' && typeof run.chosenBranches[i] !== 'number'){
+      const sel = document.createElement('select');
+      sel.innerHTML = `<option value="">Select branch…</option>` + st.branches.map((b, idx)=>`<option value="${idx}">${b.actor} ${b.condition?`(${b.condition})`:''}</option>`).join('');
+      sel.addEventListener('change', ()=>{ if(sel.value!==''){ run.chosenBranches[i]=Number(sel.value); updateWorkflowState(); } });
+      const pick = document.createElement('div'); pick.style.marginTop='8px'; pick.appendChild(sel);
+      div.appendChild(pick);
+    }
+
+    area.appendChild(div);
+  });
+  syncActingAs();
+  $('#stateOut').textContent = JSON.stringify(run, null, 2);
+  $('#configOut').textContent = JSON.stringify({builder, workflow}, null, 2);
+}
+
+function getExplainText(forStageIndex = run.currentStage) {
+    if (!workflow.stages || !workflow.stages[forStageIndex]) return 'Workflow complete.';
+    const st = workflow.stages[forStageIndex];
+    let txt = '';
+    if (st.type === 'single') {
+        txt = `Approval required from ${st.actors[0]} to proceed.`;
+    } else if (st.type === 'parallel') {
+        const remaining = st.actors.filter(a => !(run.parallelApprovals[forStageIndex]||[]).includes(a));
+        txt = remaining.length > 1 ? `Consensus step. Approvals required: ${remaining.join(', ')}.` : `Consensus step. Final approval from ${remaining[0]} will complete this step.`;
+    } else if (st.type === 'choice') {
+        const chosen = run.chosenBranches[forStageIndex];
+        if (typeof chosen === 'number') {
+            const branch = st.branches[chosen];
+            txt = `Branch selected. Routed to ${branch.actor}.`;
+            if(branch.condition) txt += ` (Condition: ${branch.condition}).`;
+        } else {
+            txt = `Branching step. Select a branch or fill form fields to auto-select.`;
+        }
+    }
+    return `Step ${forStageIndex + 1}: ${txt}`;
+}
+
+function renderExplain(containerId = 'explain'){
+  $(`#${containerId}`).textContent = getExplainText();
+}
+
+function syncActingAs(){
+  const sel = $('#actingAs'); sel.innerHTML = '';
+  const actors = currentActors();
+  actors.forEach(a=>{ const op=document.createElement('option'); op.value=a; op.textContent=a; sel.appendChild(op); });
+  if(actors.length===0) sel.innerHTML = '<option>—</option>';
+}
+
+function stepApprove(asActor){
+  const st = workflow.stages[run.currentStage];
+  if(!st) return;
+  if(st.type==='single'){
+    run.history.push({stage:run.currentStage, actor:asActor, action:'approve'});
+    run.currentStage++;
+  } else if(st.type==='parallel'){
+    if(!run.parallelApprovals[run.currentStage]) run.parallelApprovals[run.currentStage] = [];
+    if(!run.parallelApprovals[run.currentStage].includes(asActor)) { run.parallelApprovals[run.currentStage].push(asActor); }
+    run.history.push({stage:run.currentStage, actor:asActor, action:'approve'});
+    if(run.parallelApprovals[run.currentStage].length >= st.actors.length){ run.currentStage++; }
+  } else if(st.type==='choice'){
+    let idx = run.chosenBranches[run.currentStage];
+    if(typeof idx !== 'number'){
+      alert("Cannot approve: please select a branch for this step first."); return;
+    }
+    const branch = st.branches[idx];
+    run.history.push({stage:run.currentStage, actor:branch?.actor||asActor, action:'approve'});
+    run.currentStage++;
+  }
+  renderAll();
+}
+
+function stepReject(asActor){
+  run.history.push({stage:run.currentStage, actor:asActor, action:'reject'});
+  alert('Request Rejected. Workflow resetting.');
+  resetFlow();
+}
+
+function resetFlow() {
+  run = { currentStage:0, parallelApprovals:{}, chosenBranches:{}, history:[], formState: {} };
+  renderAll();
+}
+
+function renderAll() {
+    updateWorkflowState(); // Updates timeline and explain
+    renderForm(); // Re-draws form for current step, preserving state
+    if ($('#fullscreen-modal').style.display === 'flex') {
+        renderModalContent();
+    }
+}
+function updateWorkflowState() {
+    renderTimeline();
+    renderExplain();
+    if ($('#fullscreen-modal').style.display === 'flex') {
+        renderTimeline('modal-timeline');
+        renderExplain('modal-explain');
+        const actors = currentActors();
+        const sel = $('#modal-footer select');
+        if(sel) {
+            sel.innerHTML = '';
+            actors.forEach(a=>{ const o=document.createElement('option'); o.value=a; o.textContent=a; sel.appendChild(o); });
+            if(actors.length === 0) sel.innerHTML = '<option>—</option>';
+        }
+    }
+}
+
+/* ===============================
+   BUILDER -> PREVIEW
+=============================== */
+function generateMock(){
+  builder.requestName = $('#requestName').value.trim() || 'Untitled Request';
+  builder.approvalDsl = $('#approvalDsl').value.trim();
+  collectFields();
+  workflow = parseApprovalDSL(builder.approvalDsl);
+  resetFlow();
+  $('#mockTitle').textContent = `${builder.requestName} — Mock‑up`;
+}
+
+/* ===============================
+   GEMINI ASSIST (optional)
+=============================== */
+function geminiPromptTemplate(userText){
+  return `You are helping build a Form + Workflow mock-up. Return ONLY minified JSON (no backticks, no prose) matching this schema:
+{"requestName":"string","approvalDsl":"string","fields":[{"label":"string","type":"label|text|...","options":["string", "..."],"visibility":"all"|"step:N", "description":"optional string"}]}`;
+}
+async function callGemini(apiKey, text){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const body = { contents: [ { parts: [ { text } ] } ] };
+  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  let raw = data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('\n') || JSON.stringify(data);
+  return {data, raw};
+}
+function tryParseJsonFromText(text){
+  const m = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/```\s*([\s\S]*?)```/);
+  const candidate = m ? m[1] : text;
+  try { return JSON.parse(candidate); } catch(e){ return null; }
+}
+
+/* ===============================
+   EVENT HOOKS
+=============================== */
+function switchTab(name){
+  $$('#tabs .tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  $$('.tabpanel').forEach(p=>p.style.display = (p.id === 'tab-'+name ? '' : 'none'));
+}
+$('#tabs').addEventListener('click', (e)=>{ if(e.target.closest('.tab')) switchTab(e.target.dataset.tab); });
+$('#btn-add-field').addEventListener('click', ()=> { addFieldRow(); updateAllVisibilityDropdowns(); });
+$('#btn-generate').addEventListener('click', ()=>{ generateMock(); switchTab('preview'); });
+$('#btn-reset-flow').addEventListener('click', resetFlow);
+$('#btn-approve').addEventListener('click', ()=>{ if ($('#actingAs').value !== '—') stepApprove($('#actingAs').value); });
+$('#btn-reject').addEventListener('click', ()=>{ if ($('#actingAs').value !== '—') stepReject($('#actingAs').value); });
+$('#btn-save').addEventListener('click', ()=>{ collectFields(); saveFile(`${(builder.requestName||'req').replace(/\s+/g,'-')}-cfg.json`, JSON.stringify(builder, null, 2)); });
+
+$('#approvalDsl').addEventListener('input', updateAllVisibilityDropdowns);
+
+function loadConfig(cfg) {
+    builder = { requestName: cfg.requestName || '', approvalDsl: cfg.approvalDsl || '', fields: cfg.fields || [] };
+    $('#requestName').value = builder.requestName;
+    $('#approvalDsl').value = builder.approvalDsl;
+    $('#fieldsList').innerHTML = '';
+    builder.fields.forEach(f => addFieldRow(f));
+    updateAllVisibilityDropdowns(); // Populate all dropdowns based on new DSL
+
+    // Set the correct value for each visibility dropdown from loaded data
+    $$('#fieldsList .field-item').forEach((item, index) => {
+        const fieldData = builder.fields[index];
+        if (fieldData && fieldData.visibility) {
+            const visSelect = item.querySelector('.fi-vis');
+            visSelect.value = fieldData.visibility;
+            if (visSelect.selectedIndex === -1) { // Fallback if step doesn't exist
+                visSelect.value = 'all';
+            }
+        }
+    });
+    switchTab('builder');
+}
+function applyConfigFromText(text) {
+    try { const cfg = JSON.parse(text); loadConfig(cfg); $('#import-modal').style.display = 'none'; $('#import-json-textarea').value = ''; } 
+    catch (e) { alert('Invalid JSON: ' + e.message); }
+}
+$('#btn-load').addEventListener('click', () => { $('#import-modal').style.display = 'flex'; });
+$('#import-cancel-btn').addEventListener('click', () => { $('#import-modal').style.display = 'none'; $('#import-json-textarea').value = ''; });
+$$('.modal-close-btn').forEach(btn => btn.addEventListener('click', (e) => { e.target.closest('.modal-overlay').style.display = 'none'; }));
+$('#import-apply-btn').addEventListener('click', () => { if ($('#import-json-textarea').value) applyConfigFromText($('#import-json-textarea').value); });
+$('#import-from-file-btn').addEventListener('click', () => {
+    const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
+    inp.onchange = async () => { if(inp.files[0]) $('#import-json-textarea').value = await readFileAsText(inp.files[0]); };
+    inp.click();
+});
+$('#btn-load-sample').addEventListener('click', ()=>{
+  loadConfig({ requestName: 'Hardware Request', approvalDsl: 'Employee > Manager > Procurement (Category == "Standard") or IT Security (Category == "Specialized") > CIO (Amount > 5000)',
+    fields: [ {id:uid(), label:'Employee Name', type:'people', visibility:'all', description: 'The employee requesting the hardware.'}, {id:uid(), label:'Category', type:'dropdown', options:['Standard','Specialized'], visibility:'step:1', description: 'Select the category of hardware.'}, {id:uid(), label:'Item', type:'text', visibility:'step:1', description: 'e.g., Laptop, Monitor, Keyboard'}, {id:uid(), label:'Amount', type:'text', visibility:'step:1'}, {id:uid(), label:'Business Justification', type:'textarea', visibility:'all'}, ] });
+});
+$('#geminiKey').value = localStorage.getItem('GEMINI_API_KEY') || '';
+$('#geminiKey').addEventListener('change', ()=> localStorage.setItem('GEMINI_API_KEY', $('#geminiKey').value));
+$('#btn-gemini-build').addEventListener('click', async ()=>{
+  const key = $('#geminiKey').value.trim(); if(!key){ alert('API key required'); return; }
+  $('#geminiRaw').textContent = 'Calling Gemini…';
+  try{
+    const {raw} = await callGemini(key, geminiPromptTemplate($('#geminiPrompt').value.trim()));
+    $('#geminiRaw').textContent = raw;
+    const parsed = tryParseJsonFromText(raw); if(!parsed){ alert('Could not parse valid JSON from response.'); return; }
+    loadConfig({ requestName: parsed.requestName || 'Untitled', approvalDsl: parsed.approvalDsl || '', fields: (parsed.fields||[]).map(f=>({ id:uid(), ...f })) });
+  }catch(err){ $('#geminiRaw').textContent = 'Error: ' + err.message; }
+});
+
+/* ==================================================
+   FULLSCREEN AND PDF EXPORT LOGIC
+================================================== */
+function renderModalContent() {
+    $('#modal-body').innerHTML = `<div id="modal-timeline" class="timeline" style="margin-bottom:20px;"></div> <div id="modal-explain" class="muted" style="margin-bottom:20px; padding:10px; border-radius:8px; background:var(--panel-2); border:1px solid var(--border);"></div> <div id="modal-form" class="preview-form"></div>`;
+    $('#modal-footer').innerHTML = '';
+    updateWorkflowState(); // Renders timeline, explain, actor list
+    renderForm('modal-form');
+    const actors = currentActors();
+    const actingAsSelect = document.createElement('select');
+    actors.forEach(a=>{ const o=document.createElement('option'); o.value=a; o.textContent=a; actingAsSelect.appendChild(o); });
+    if(actors.length===0) actingAsSelect.innerHTML = '<option>—</option>';
+    const approveBtn = document.createElement('button'); approveBtn.className = 'btn good'; approveBtn.textContent = 'Approve'; approveBtn.onclick = () => { if(actingAsSelect.value!=='—') stepApprove(actingAsSelect.value); };
+    const rejectBtn = document.createElement('button'); rejectBtn.className = 'btn danger'; rejectBtn.textContent = 'Reject'; rejectBtn.onclick = () => { if(actingAsSelect.value!=='—') stepReject(actingAsSelect.value); };
+    const resetBtn = document.createElement('button'); resetBtn.className = 'btn ghost'; resetBtn.textContent = 'Reset'; resetBtn.onclick = resetFlow;
+    const pill = document.createElement('span'); pill.className = 'pill'; pill.innerHTML = 'Acting as: '; pill.appendChild(actingAsSelect);
+    $('#modal-footer').append(pill, Object.assign(document.createElement('span'), {className:'spacer'}), resetBtn, rejectBtn, approveBtn);
+}
+
+$('#btn-fullscreen').addEventListener('click', () => {
+    $('#modalTitle').textContent = $('#mockTitle').textContent;
+    renderModalContent();
+    $('#fullscreen-modal').style.display = 'flex';
+});
+
+async function captureAndAddPagedImage(doc, element) {
+    element.classList.add('pdf-capture-mode');
+    await new Promise(r => setTimeout(r, 50));
+    const canvas = await html2canvas(element, { scale: 2, windowWidth: element.scrollWidth, windowHeight: element.scrollHeight });
+    element.classList.remove('pdf-capture-mode');
+    
+    const imgData = canvas.toDataURL('image/jpeg', 0.8);
+    const {width: imgWidth, height: imgHeight} = doc.getImageProperties(imgData);
+    const {width: pdfWidth, height: pdfHeight} = doc.internal.pageSize;
+    const margin = 20, contentWidth = pdfWidth - margin*2, contentHeight = pdfHeight - 50;
+    const pagedImgHeight = (imgHeight * contentWidth) / imgWidth;
+    let heightLeft = pagedImgHeight, position = 0;
+    doc.addImage(imgData, 'JPEG', margin, 40, contentWidth, pagedImgHeight);
+    heightLeft -= contentHeight;
+    while (heightLeft > 0) {
+        position += contentHeight;
+        doc.addPage();
+        doc.addImage(imgData, 'JPEG', margin, 40 - position, contentWidth, pagedImgHeight);
+        heightLeft -= contentHeight;
+    }
+}
+
+async function generatePdfPath(doc, pathRunState, pathPrefix) {
+    const currentStep = pathRunState.currentStage;
+    if (currentStep >= workflow.stages.length) return;
+    const stage = workflow.stages[currentStep];
+
+    if (stage.type === 'choice') {
+        for (let i = 0; i < stage.branches.length; i++) {
+            const branch = stage.branches[i];
+            const newRunState = JSON.parse(JSON.stringify(pathRunState));
+            newRunState.chosenBranches[currentStep] = i;
+            const branchPrefix = `${pathPrefix} > Branch ${i+1} (${branch.actor})`;
+            run = newRunState;
+            renderAll();
+            await new Promise(r => setTimeout(r, 100));
+            doc.addPage();
+            doc.setFontSize(10).setTextColor(150,150,150).text(`PATH: ${branchPrefix}`, 20, 20);
+            doc.setFontSize(14).setTextColor(0,0,0).text(getExplainText(), 20, 30, { maxWidth: doc.internal.pageSize.getWidth() - 40 });
+            await captureAndAddPagedImage(doc, $('#main-preview-content'));
+            newRunState.currentStage++;
+            await generatePdfPath(doc, newRunState, branchPrefix);
+        }
+    } else {
+        run = pathRunState;
+        renderAll();
+        await new Promise(r => setTimeout(r, 100));
+        doc.addPage();
+        doc.setFontSize(10).setTextColor(150,150,150).text(`PATH: ${pathPrefix}`, 20, 20);
+        doc.setFontSize(14).setTextColor(0,0,0).text(getExplainText(), 20, 30, { maxWidth: doc.internal.pageSize.getWidth() - 40 });
+        await captureAndAddPagedImage(doc, $('#main-preview-content'));
+        pathRunState.currentStage++;
+        await generatePdfPath(doc, pathRunState, pathPrefix);
+    }
+}
+
+$('#btn-export-pdf').addEventListener('click', async () => {
+    if (!workflow || !workflow.stages.length) { alert("Generate a mock-up first."); return; }
+    const note = document.body.appendChild(Object.assign(document.createElement('div'), {className:'pdf-export-note'}));
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'p', unit: 'px', format: 'a4' });
+        const originalRunState = JSON.parse(JSON.stringify(run));
+        note.style.display = 'block'; note.textContent = 'Generating Title Page...';
+        doc.setFontSize(22).text(builder.requestName, doc.internal.pageSize.getWidth()/2, 40, {align:'center'});
+        doc.setFontSize(12).text('Workflow Logic (DSL):', 20, 120);
+        doc.setFont('courier').text(builder.approvalDsl, 20, 135, {maxWidth:doc.internal.pageSize.getWidth()-40}).setFont('helvetica');
+        note.textContent = 'Generating workflow paths...';
+        await generatePdfPath(doc, { currentStage:0, parallelApprovals:{}, chosenBranches:{}, history:[], formState: originalRunState.formState }, 'Start');
+        note.textContent = 'Generating Appendix...';
+        doc.addPage();
+        doc.setFontSize(16).text('Technical Configuration (JSON)', 20, 30);
+        doc.setFontSize(8).setFont('courier').text(doc.splitTextToSize(JSON.stringify({builder, workflow}, null, 2), doc.internal.pageSize.getWidth() - 40), 20, 50);
+        note.textContent = 'Finalizing PDF...';
+        run = originalRunState; renderAll();
+        doc.save(`${(builder.requestName||'req').replace(/\s+/g,'-')}-mockup.pdf`);
+    } catch (err) { console.error("PDF Export Error:", err); alert('PDF generation error.'); } 
+    finally { if(note.parentNode) note.remove(); }
+});
+
+/* ===============================
+   INIT
+=============================== */
+(function init(){
+  addFieldRow();
+  updateAllVisibilityDropdowns();
+  syncActingAs();
+  document.body.addEventListener('input', (e) => {
+    if (e.target.matches('#main-preview-content [data-fid], #modal-body [data-fid]')) {
+        run.formState[e.target.dataset.fid] = e.target.value;
+        updateWorkflowState();
+    }
+  });
+})();
+</script>
+</body>
+</html>

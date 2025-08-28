@@ -167,11 +167,11 @@
     z-index: 9999; display: none;
   }
 
-  /* NEW: Print-friendly styles for PDF capture */
+  /* --- PDF CAPTURE STYLES --- */
   .pdf-capture-mode {
     background: #ffffff !important;
     color: #000000 !important;
-    padding: 16px; /* Re-add padding that might be lost */
+    padding: 16px; 
   }
   .pdf-capture-mode .card,
   .pdf-capture-mode .stage,
@@ -193,13 +193,32 @@
   .pdf-capture-mode .stage.current {
     outline: 2px solid #0056b3 !important;
   }
-  /* NEW: Highlight selected branch in PDF export */
   .pdf-capture-mode .chip.alt {
     background: #d4edda !important;
     color: #155724 !important;
     border: 1px solid #b7e0c1 !important;
     font-weight: bold;
   }
+  /* NEW: Timeline wrapping logic for PDF export */
+  .pdf-capture-mode .timeline {
+    flex-wrap: wrap;
+    gap: 20px 40px; /* Add more vertical and horizontal gap for wrapped items */
+    padding-right: 20px; /* Ensure last arrow is not clipped */
+  }
+  .pdf-capture-mode .stage {
+    flex-shrink: 0; /* Prevent stages from shrinking */
+  }
+  .pdf-capture-mode .stage:not(:last-child)::after {
+    content: '→';
+    position: absolute;
+    right: -28px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #555555 !important;
+    font-size: 24px;
+    font-weight: bold;
+  }
+
 </style>
 </head>
 <body>
@@ -282,13 +301,14 @@
           </div>
         </div>
         <div class="divider"></div>
-        <label>Describe your request, fields, and approvals</label>
+        <label>Describe your workflow in plain English</label>
         <textarea id="geminiPrompt" placeholder="Example:
-Request: Vendor Onboarding
-Fields: Requestor (People-Picker, All steps); Vendor Name (Textfield, Step 1); Category (Dropdown: Software, Hardware, Services, Step 1); Start Date (Date, Step 1); Notes (Comment Box, All steps, desc: Internal notes for approvers); Amount (Textfield, Step 2)
-Approvals: Manager > Procurement + Legal > CFO or CEO (Amount > 50000)
+A travel request that first goes to the employee's Manager. 
+If the trip is international, it also needs approval from Security. 
+If the total cost is over $5000, it must be approved by the CFO after the manager.
+Finally, the request goes to HR.
 "></textarea>
-        <div class="small muted">Gemini will return a JSON config for this builder.</div>
+        <div class="small muted">Gemini will analyze the text to create the approval flow and infer necessary UI fields (e.g., a 'Trip Type' dropdown for an 'international' condition).</div>
         <div class="divider"></div>
         <label>Last Gemini Response (raw)</label>
         <pre class="code" id="geminiRaw" style="min-height:100px"></pre>
@@ -301,7 +321,7 @@ Approvals: Manager > Procurement + Legal > CFO or CEO (Amount > 50000)
         <ul>
           <li>This is an optional accelerator; you can always build manually in the Builder tab.</li>
           <li>If CORS blocks in your environment, call the API from a small backend or a secure proxy.</li>
-          <li>We instruct Gemini to output a specific JSON schema; you can tweak the prompt if needed.</li>
+          <li>The AI is instructed to infer fields and workflow logic. Complex descriptions may require manual refinement.</li>
         </ul>
       </div>
     </div>
@@ -942,8 +962,35 @@ function generateMock(){
    GEMINI ASSIST (optional)
 =============================== */
 function geminiPromptTemplate(userText){
-  return `You are helping build a Form + Workflow mock-up. Return ONLY minified JSON (no backticks, no prose) matching this schema:
-{"requestName":"string","approvalDsl":"string","fields":[{"label":"string","type":"label|text|people|date|...","options":["string", "..."],"visibility":"all"|"step:N", "description":"optional string"}]}`;
+  // This new, more sophisticated prompt guides the model to reason about the user's text.
+  return `You are an expert business process analyst. Your task is to convert a user's natural language description of a workflow into a specific JSON format for a mock-up builder.
+
+Analyze the provided text to infer three things:
+1.  A suitable 'requestName'.
+2.  The 'approvalDsl', a string representing the workflow logic.
+3.  The 'fields', a list of UI fields needed to support the workflow.
+
+**Approval DSL Syntax Rules:**
+-   Sequential steps use '>'. Example: 'Manager > HR'
+-   Parallel / consensus steps use '+'. Example: 'Finance + Legal' (both must approve).
+-   Branching / choices use 'or'. Example: 'CFO or CEO'
+-   Conditions for branches are in parentheses '()'. Example: 'CFO (Amount > 5000) or CEO (Amount > 20000)'
+
+**Field Inference Rules (VERY IMPORTANT):**
+-   If the user's description contains a condition or a choice (e.g., "if the trip is international", "if cost is over 5000", "based on event type"), you MUST create a UI field to control that condition.
+-   For binary choices (e.g., 'international vs. domestic'), create a 'dropdown' field with appropriate options. The field label should match the condition variable (e.g., 'Trip Type', with options 'International', 'Domestic'). The condition in the DSL should be like '(Trip Type == "International")'.
+-   For numeric conditions (e.g., 'cost over 5000'), create a 'text' field. The field label should be the variable (e.g., 'Total Cost'). The DSL condition should be like '(Total Cost > 5000)'.
+-   Assume a 'Requester' or 'Employee' field of type 'people' is needed unless specified otherwise.
+-   Make fields visible on 'step:1' by default, unless the context implies they are needed everywhere ('all').
+
+**Final Output:**
+-   Return ONLY the minified JSON object.
+-   Do NOT include any explanations, markdown backticks, or prose in your response.
+
+Here is the user's description:
+---
+${userText}
+---`;
 }
 async function callGemini(apiKey, text){
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -1019,7 +1066,7 @@ $('#geminiKey').value = localStorage.getItem('GEMINI_API_KEY') || '';
 $('#geminiKey').addEventListener('change', ()=> localStorage.setItem('GEMINI_API_KEY', $('#geminiKey').value));
 $('#btn-gemini-build').addEventListener('click', async ()=>{
   const key = $('#geminiKey').value.trim(); if(!key){ alert('API key required'); return; }
-  $('#geminiRaw').textContent = 'Calling Gemini…';
+  $('#geminiRaw').textContent = 'Thinking... this may take a moment.';
   try{
     const {raw} = await callGemini(key, geminiPromptTemplate($('#geminiPrompt').value.trim()));
     $('#geminiRaw').textContent = raw;
